@@ -4,7 +4,7 @@ const Map = () => {
   useEffect(() => {
     const script = document.createElement('script')
     script.src =
-      'https://api-maps.yandex.ru/2.1/?apikey=826955e1-1d34-4121-809c-5a60a695cc99&lang=en_US'
+      'https://api-maps.yandex.ru/2.1/?apikey=<>&lang=en_US'
     script.async = true
     script.onload = () => {
       ymaps.ready(initMap)
