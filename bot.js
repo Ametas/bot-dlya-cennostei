@@ -38,6 +38,7 @@ bot.onText(/\/start/, (msg) => {
 
 bot.on('message', (msg) => {
   const chatId = msg.chat.id
+
   if (msg.location) {
     const { latitude, longitude } = msg.location
 
@@ -68,31 +69,95 @@ bot.on('message', (msg) => {
       )
       .catch((error) => console.error('Error sending location message', error))
 
-    const placesButtons = locations[closestLocation].places.map(
-      (place, index) => {
-        return [
-          { text: place.name, callback_data: `${closestLocation}:${index}` },
-        ]
-      },
-    )
+    if (closestDistance <= 1) {
+      const options = {
+        reply_markup: {
+          keyboard: [[{ text: 'Начать тест' }]],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      }
 
-    const options = {
-      reply_markup: {
-        inline_keyboard: placesButtons,
-      },
-    }
+      bot
+        .sendMessage(
+          chatId,
+          'Вы находитесь в радиусе 1 км от ближайшей локации. Нажмите кнопку, чтобы начать тест:',
+          options,
+        )
+        .catch((error) =>
+          console.error('Error sending test button message', error),
+        )
 
-    bot
-      .sendMessage(
-        chatId,
-        `Вы сейчас находитесь в районе ${closestLocation}. Выберите подлокацию:`,
-        options,
+      bot.userData[chatId] = {
+        userLocation: { latitude, longitude },
+        closestLocation: closestLocation,
+        currentQuestionIndex: 0,
+      }
+    } else {
+      const placesButtons = locations[closestLocation].places.map(
+        (place, index) => {
+          return [
+            { text: place.name, callback_data: `${closestLocation}:${index}` },
+          ]
+        },
       )
-      .catch((error) => console.error('Error sending places message', error))
 
-    bot.userData[chatId] = {
-      userLocation: { latitude, longitude },
-      closestLocation: closestLocation,
+      const options = {
+        reply_markup: {
+          inline_keyboard: placesButtons,
+        },
+      }
+
+      bot
+        .sendMessage(
+          chatId,
+          `Вы сейчас находитесь в районе ${closestLocation}. Выберите подлокацию:`,
+          options,
+        )
+        .catch((error) => console.error('Error sending places message', error))
+    }
+  } else if (msg.text === 'Начать тест') {
+    const userData = bot.userData[chatId]
+    if (userData) {
+      const closestLocation = userData.closestLocation
+      const questions = locations[closestLocation].questions
+      const currentQuestionIndex = userData.currentQuestionIndex
+
+      if (currentQuestionIndex < questions.length) {
+        const question = questions[currentQuestionIndex]
+        bot.sendMessage(chatId, question, {
+          reply_markup: {
+            remove_keyboard: true,
+          },
+        })
+
+        userData.currentQuestionIndex += 1
+      } else {
+        bot.sendMessage(chatId, 'Тест завершен! Спасибо за участие.')
+        delete bot.userData[chatId]
+      }
+    }
+  } else if (
+    bot.userData[chatId] &&
+    bot.userData[chatId].currentQuestionIndex > 0
+  ) {
+    const userData = bot.userData[chatId]
+    const closestLocation = userData.closestLocation
+    const questions = locations[closestLocation].questions
+    const currentQuestionIndex = userData.currentQuestionIndex
+
+    if (currentQuestionIndex < questions.length) {
+      const question = questions[currentQuestionIndex]
+      bot.sendMessage(chatId, question, {
+        reply_markup: {
+          remove_keyboard: true,
+        },
+      })
+
+      userData.currentQuestionIndex += 1
+    } else {
+      bot.sendMessage(chatId, 'Тест завершен! Спасибо за участие.')
+      delete bot.userData[chatId]
     }
   }
 })
