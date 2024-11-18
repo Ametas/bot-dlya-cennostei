@@ -4,12 +4,16 @@ const TelegramBot = require('node-telegram-bot-api')
 
 const token = process.env.BOT_TOKEN
 const bot = new TelegramBot(token, { polling: true })
+const botConfig = require('./config/bot.config.json')
+
 const locations = require('./assets/locations.json')
 
 const {
   getDistanceInKm,
   isOnLocation,
 } = require('./controllers/locations.controller')
+
+bot.userData = {}
 
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id
@@ -47,7 +51,6 @@ bot.on('message', (msg) => {
         coords.latitude,
         coords.longitude,
       )
-      console.log(distance)
       if (distance < closestDistance) {
         closestDistance = distance
         closestLocation = locationName
@@ -87,8 +90,7 @@ bot.on('message', (msg) => {
       )
       .catch((error) => console.error('Error sending places message', error))
 
-    bot.userData = {
-      chatId: chatId,
+    bot.userData[chatId] = {
       userLocation: { latitude, longitude },
       closestLocation: closestLocation,
     }
@@ -97,28 +99,40 @@ bot.on('message', (msg) => {
 
 bot.on('callback_query', (callbackQuery) => {
   const msg = callbackQuery.message
+  const chatId = msg.chat.id
   const [locationName, placeIndex] = callbackQuery.data.split(':')
-  const userLocation = bot.userData.userLocation
-  const selectedPlace = locations[locationName].places[placeIndex]
+  const userLocation = bot.userData[chatId]?.userLocation
 
-  if (selectedPlace) {
-    const distanceToPlace = getDistanceInKm(
-      userLocation.latitude,
-      userLocation.longitude,
-      selectedPlace.latitude,
-      selectedPlace.longitude,
+  if (userLocation) {
+    const selectedPlace = locations[locationName].places[placeIndex]
+
+    if (selectedPlace) {
+      const distanceToPlace = getDistanceInKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        selectedPlace.latitude,
+        selectedPlace.longitude,
+      )
+
+      let responseText = isOnLocation(distanceToPlace, botConfig.accuracy)
+        ? 'Вы на месте!'
+        : `Вы находитесь в ${distanceToPlace.toFixed(2)} км от ${
+            selectedPlace.name
+          }.`
+
+      bot
+        .sendMessage(chatId, responseText)
+        .catch((error) =>
+          console.error('Error sending distance message', error),
+        )
+    }
+  } else {
+    bot.sendMessage(
+      chatId,
+      'Не удалось получить ваше местоположение. Пожалуйста, отправьте его снова.',
     )
-
-    let responseText = isOnLocation(distanceToPlace, 0.05)
-      ? 'Вы на месте!'
-      : `Вы находитесь в ${distanceToPlace.toFixed(2)} км от ${
-          selectedPlace.name
-        }.`
-
-    bot
-      .sendMessage(bot.userData.chatId, responseText)
-      .catch((error) => console.error('Error sending distance message', error))
   }
+
   bot.answerCallbackQuery(callbackQuery.id)
 })
 

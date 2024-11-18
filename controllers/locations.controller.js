@@ -1,5 +1,5 @@
-function isOnLocation(userDistance, distanceToPlace) {
-  return userDistance <= distanceToPlace
+function isOnLocation(userDistance, accuracy) {
+  return userDistance <= accuracy
 }
 
 function getDistanceInKm(lat1, lon1, lat2, lon2) {
